@@ -2,14 +2,30 @@ import { randomUUID } from "node:crypto";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import { fetchClientIdMetadataDocument, looksLikeClientIdUrl } from "./cimd.js";
+import { logOAuthServerError } from "./logging.js";
 import { dynamicallyRegisteredClients } from "./store.js";
 
 export const clientsStore: OAuthRegisteredClientsStore = {
   async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
-    if (looksLikeClientIdUrl(clientId)) {
-      return fetchClientIdMetadataDocument(clientId);
+    try {
+      if (looksLikeClientIdUrl(clientId)) {
+        return await fetchClientIdMetadataDocument(clientId);
+      }
+      return dynamicallyRegisteredClients.get(clientId);
+    } catch (error) {
+      // Re-thrown as-is: this only adds visibility into a failure that the
+      // SDK's authenticateClient/authorizationHandler would otherwise swallow
+      // into an unlogged 500 or 400.
+      logOAuthServerError(
+        {
+          stage: "clientsStore.getClient",
+          clientId,
+          params: { isClientIdMetadataDocumentUrl: looksLikeClientIdUrl(clientId) },
+        },
+        error,
+      );
+      throw error;
     }
-    return dynamicallyRegisteredClients.get(clientId);
   },
 
   registerClient(

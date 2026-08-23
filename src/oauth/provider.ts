@@ -19,6 +19,7 @@ import {
 import { config } from "../config.js";
 import { clientsStore } from "./clientsStore.js";
 import { renderConsentPage } from "./consentPage.js";
+import { logOAuthServerError } from "./logging.js";
 import {
   authorizationCodes,
   markTokenRevoked,
@@ -113,15 +114,28 @@ export const shopifyMcpOAuthProvider: OAuthServerProvider = {
     client: OAuthClientInformationFull,
     authorizationCode: string,
   ): Promise<string> {
-    const entry = authorizationCodes.get(authorizationCode);
-    if (!entry || entry.clientId !== client.client_id) {
-      throw new InvalidGrantError("Invalid authorization code");
+    try {
+      const entry = authorizationCodes.get(authorizationCode);
+      if (!entry || entry.clientId !== client.client_id) {
+        throw new InvalidGrantError("Invalid authorization code");
+      }
+      if (entry.expiresAt < Date.now()) {
+        authorizationCodes.delete(authorizationCode);
+        throw new InvalidGrantError("Authorization code has expired");
+      }
+      return entry.codeChallenge;
+    } catch (error) {
+      logOAuthServerError(
+        {
+          stage: "challengeForAuthorizationCode",
+          grantType: "authorization_code",
+          clientId: client.client_id,
+          params: { hasAuthorizationCode: Boolean(authorizationCode) },
+        },
+        error,
+      );
+      throw error;
     }
-    if (entry.expiresAt < Date.now()) {
-      authorizationCodes.delete(authorizationCode);
-      throw new InvalidGrantError("Authorization code has expired");
-    }
-    return entry.codeChallenge;
   },
 
   async exchangeAuthorizationCode(
@@ -131,43 +145,61 @@ export const shopifyMcpOAuthProvider: OAuthServerProvider = {
     redirectUri?: string,
     resource?: URL,
   ): Promise<OAuthTokens> {
-    const entry = authorizationCodes.get(authorizationCode);
-    if (!entry || entry.clientId !== client.client_id) {
-      throw new InvalidGrantError("Invalid authorization code");
-    }
-    authorizationCodes.delete(authorizationCode);
+    try {
+      const entry = authorizationCodes.get(authorizationCode);
+      if (!entry || entry.clientId !== client.client_id) {
+        throw new InvalidGrantError("Invalid authorization code");
+      }
+      authorizationCodes.delete(authorizationCode);
 
-    if (entry.expiresAt < Date.now()) {
-      throw new InvalidGrantError("Authorization code has expired");
-    }
-    if (redirectUri !== undefined && redirectUri !== entry.redirectUri) {
-      throw new InvalidGrantError("redirect_uri does not match the authorization request");
-    }
-    assertCanonicalResource(resource);
-    if (entry.resource !== undefined && resource !== undefined && entry.resource !== resource.href) {
-      throw new InvalidTargetError("resource does not match the authorization request");
-    }
+      if (entry.expiresAt < Date.now()) {
+        throw new InvalidGrantError("Authorization code has expired");
+      }
+      if (redirectUri !== undefined && redirectUri !== entry.redirectUri) {
+        throw new InvalidGrantError("redirect_uri does not match the authorization request");
+      }
+      assertCanonicalResource(resource);
+      if (entry.resource !== undefined && resource !== undefined && entry.resource !== resource.href) {
+        throw new InvalidTargetError("resource does not match the authorization request");
+      }
 
-    const { token, expiresAt } = await signAccessToken({
-      clientId: client.client_id,
-      scopes: entry.scopes,
-      resource: config.mcpResourceUrl.href,
-    });
-    const refreshToken = randomToken();
-    refreshTokens.set(refreshToken, {
-      clientId: client.client_id,
-      scopes: entry.scopes,
-      resource: entry.resource,
-      expiresAt: newRefreshTokenExpiry(),
-    });
+      const { token, expiresAt } = await signAccessToken({
+        clientId: client.client_id,
+        scopes: entry.scopes,
+        resource: config.mcpResourceUrl.href,
+      });
+      const refreshToken = randomToken();
+      refreshTokens.set(refreshToken, {
+        clientId: client.client_id,
+        scopes: entry.scopes,
+        resource: entry.resource,
+        expiresAt: newRefreshTokenExpiry(),
+      });
 
-    return {
-      access_token: token,
-      token_type: "Bearer",
-      expires_in: expiresAt - Math.floor(Date.now() / 1000),
-      scope: entry.scopes.join(" "),
-      refresh_token: refreshToken,
-    };
+      return {
+        access_token: token,
+        token_type: "Bearer",
+        expires_in: expiresAt - Math.floor(Date.now() / 1000),
+        scope: entry.scopes.join(" "),
+        refresh_token: refreshToken,
+      };
+    } catch (error) {
+      logOAuthServerError(
+        {
+          stage: "exchangeAuthorizationCode",
+          grantType: "authorization_code",
+          clientId: client.client_id,
+          params: {
+            hasAuthorizationCode: Boolean(authorizationCode),
+            hasCodeVerifier: Boolean(_codeVerifier),
+            hasRedirectUri: Boolean(redirectUri),
+            hasResource: Boolean(resource),
+          },
+        },
+        error,
+      );
+      throw error;
+    }
   },
 
   async exchangeRefreshToken(
@@ -176,43 +208,60 @@ export const shopifyMcpOAuthProvider: OAuthServerProvider = {
     scopes?: string[],
     resource?: URL,
   ): Promise<OAuthTokens> {
-    const entry = refreshTokens.get(refreshToken);
-    if (!entry || entry.clientId !== client.client_id) {
-      throw new InvalidGrantError("Invalid refresh token");
+    try {
+      const entry = refreshTokens.get(refreshToken);
+      if (!entry || entry.clientId !== client.client_id) {
+        throw new InvalidGrantError("Invalid refresh token");
+      }
+      refreshTokens.delete(refreshToken);
+
+      if (entry.expiresAt < Date.now()) {
+        throw new InvalidGrantError("Refresh token has expired");
+      }
+      assertCanonicalResource(resource);
+
+      const grantedScopes =
+        scopes && scopes.length > 0 ? scopes.filter((scope) => entry.scopes.includes(scope)) : entry.scopes;
+      if (grantedScopes.length === 0) {
+        throw new InvalidGrantError("Requested scope exceeds the scope originally granted");
+      }
+
+      const { token, expiresAt } = await signAccessToken({
+        clientId: client.client_id,
+        scopes: grantedScopes,
+        resource: config.mcpResourceUrl.href,
+      });
+      const newRefresh = randomToken();
+      refreshTokens.set(newRefresh, {
+        clientId: client.client_id,
+        scopes: grantedScopes,
+        resource: entry.resource,
+        expiresAt: newRefreshTokenExpiry(),
+      });
+
+      return {
+        access_token: token,
+        token_type: "Bearer",
+        expires_in: expiresAt - Math.floor(Date.now() / 1000),
+        scope: grantedScopes.join(" "),
+        refresh_token: newRefresh,
+      };
+    } catch (error) {
+      logOAuthServerError(
+        {
+          stage: "exchangeRefreshToken",
+          grantType: "refresh_token",
+          clientId: client.client_id,
+          params: {
+            hasRefreshToken: Boolean(refreshToken),
+            hasScope: Boolean(scopes && scopes.length > 0),
+            hasResource: Boolean(resource),
+          },
+        },
+        error,
+      );
+      throw error;
     }
-    refreshTokens.delete(refreshToken);
-
-    if (entry.expiresAt < Date.now()) {
-      throw new InvalidGrantError("Refresh token has expired");
-    }
-    assertCanonicalResource(resource);
-
-    const grantedScopes =
-      scopes && scopes.length > 0 ? scopes.filter((scope) => entry.scopes.includes(scope)) : entry.scopes;
-    if (grantedScopes.length === 0) {
-      throw new InvalidGrantError("Requested scope exceeds the scope originally granted");
-    }
-
-    const { token, expiresAt } = await signAccessToken({
-      clientId: client.client_id,
-      scopes: grantedScopes,
-      resource: config.mcpResourceUrl.href,
-    });
-    const newRefresh = randomToken();
-    refreshTokens.set(newRefresh, {
-      clientId: client.client_id,
-      scopes: grantedScopes,
-      resource: entry.resource,
-      expiresAt: newRefreshTokenExpiry(),
-    });
-
-    return {
-      access_token: token,
-      token_type: "Bearer",
-      expires_in: expiresAt - Math.floor(Date.now() / 1000),
-      scope: grantedScopes.join(" "),
-      refresh_token: newRefresh,
-    };
   },
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
