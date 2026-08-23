@@ -2,15 +2,21 @@ import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { config } from "./config.js";
 import { createMcpServer } from "./server.js";
+import { oauthRouter, requireShopifyMcpBearerAuth } from "./oauth/router.js";
 
 const app = express();
 app.use(express.json());
+
+// OAuth 2.1 authorization server + protected resource metadata for this server.
+// Mounted at the app root so /.well-known/*, /authorize, /token, and /register
+// are all reachable, per the MCP authorization specification.
+app.use(oauthRouter);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-app.post("/mcp", async (req, res) => {
+app.post("/mcp", requireShopifyMcpBearerAuth, async (req, res) => {
   try {
     const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport({
