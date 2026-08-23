@@ -5,6 +5,12 @@ import { createMcpServer } from "./server.js";
 import { oauthRouter, requireShopifyMcpBearerAuth } from "./oauth/router.js";
 
 const app = express();
+
+// Railway terminates TLS and proxies over a single hop, so trust exactly one
+// level of X-Forwarded-* headers. This gives the OAuth endpoints' rate
+// limiting (express-rate-limit) the real client IP instead of Railway's edge.
+app.set("trust proxy", 1);
+
 app.use(express.json());
 
 // OAuth 2.1 authorization server + protected resource metadata for this server.
