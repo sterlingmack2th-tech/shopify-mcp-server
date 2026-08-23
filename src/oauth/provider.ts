@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { Response } from "express";
 import type {
   OAuthServerProvider,
@@ -19,6 +19,7 @@ import {
 import { config } from "../config.js";
 import { clientsStore } from "./clientsStore.js";
 import { renderConsentPage } from "./consentPage.js";
+import { safeCompare } from "./crypto.js";
 import { logOAuthServerError } from "./logging.js";
 import {
   authorizationCodes,
@@ -33,16 +34,6 @@ export const DEFAULT_SCOPES = ["shopify"];
 
 function randomToken(): string {
   return randomBytes(32).toString("base64url");
-}
-
-function safeCompare(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  if (aBuf.length !== bBuf.length) {
-    timingSafeEqual(aBuf, aBuf);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
 }
 
 function assertCanonicalResource(resource: URL | undefined): void {

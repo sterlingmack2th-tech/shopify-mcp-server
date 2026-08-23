@@ -3,10 +3,17 @@ import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/share
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import { fetchClientIdMetadataDocument, looksLikeClientIdUrl } from "./cimd.js";
 import { logOAuthServerError } from "./logging.js";
+import { staticClaudeClient } from "./staticClient.js";
 import { dynamicallyRegisteredClients } from "./store.js";
 
 export const clientsStore: OAuthRegisteredClientsStore = {
   async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
+    // The pre-registered static client is matched by exact client_id and
+    // never goes through CIMD, even if its ID happens to look like a URL.
+    if (staticClaudeClient && clientId === staticClaudeClient.client_id) {
+      return staticClaudeClient;
+    }
+
     try {
       if (looksLikeClientIdUrl(clientId)) {
         return await fetchClientIdMetadataDocument(clientId);

@@ -11,6 +11,7 @@ import { revocationHandler } from "@modelcontextprotocol/sdk/server/auth/handler
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { config } from "../config.js";
 import { DEFAULT_SCOPES, shopifyMcpOAuthProvider } from "./provider.js";
+import { requireStaticClaudeClientSecret } from "./staticClientTokenAuth.js";
 
 const oauthMetadata = createOAuthMetadata({
   provider: shopifyMcpOAuthProvider,
@@ -28,6 +29,16 @@ export const oauthRouter = express.Router();
 oauthRouter.use(
   new URL(oauthMetadata.authorization_endpoint).pathname,
   authorizationHandler({ provider: shopifyMcpOAuthProvider }),
+);
+
+// A body parser here lets requireStaticClaudeClientSecret inspect
+// client_id/client_secret before tokenHandler runs. tokenHandler applies its
+// own express.urlencoded() too, which is a documented no-op once the body
+// has already been parsed, so this doesn't affect other clients (CIMD/DCR).
+oauthRouter.use(
+  new URL(oauthMetadata.token_endpoint).pathname,
+  express.urlencoded({ extended: false }),
+  requireStaticClaudeClientSecret,
 );
 
 oauthRouter.use(

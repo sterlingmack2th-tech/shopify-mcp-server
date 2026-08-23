@@ -6,6 +6,14 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name];
+  if (!value || value.trim() === "") {
+    return undefined;
+  }
+  return value;
+}
+
 const mcpPublicUrlRaw = requireEnv("MCP_PUBLIC_URL");
 let mcpPublicUrl: URL;
 try {
@@ -36,6 +44,19 @@ if (mcpAdminPassword.length < 12) {
 
 const mcpResourceUrl = new URL("/mcp", mcpPublicUrl);
 
+// Optional pre-registered client for Claude Desktop's connector UI, as an
+// alternative to CIMD/DCR. Both or neither must be set.
+const claudeOAuthClientId = optionalEnv("CLAUDE_OAUTH_CLIENT_ID");
+const claudeOAuthClientSecret = optionalEnv("CLAUDE_OAUTH_CLIENT_SECRET");
+if (Boolean(claudeOAuthClientId) !== Boolean(claudeOAuthClientSecret)) {
+  throw new Error(
+    "CLAUDE_OAUTH_CLIENT_ID and CLAUDE_OAUTH_CLIENT_SECRET must both be set together, or both left unset.",
+  );
+}
+if (claudeOAuthClientSecret && claudeOAuthClientSecret.length < 16) {
+  throw new Error("CLAUDE_OAUTH_CLIENT_SECRET must be at least 16 characters long.");
+}
+
 export const config = {
   port: Number(process.env.PORT) || 3000,
   shopifyStore: requireEnv("SHOPIFY_STORE"),
@@ -53,4 +74,7 @@ export const config = {
   mcpOAuthSigningSecret,
   /** Shared password used to gate the OAuth consent screen. Never reused for Shopify auth. */
   mcpAdminPassword,
+  /** Pre-registered OAuth client for Claude Desktop, if configured. Never reused for Shopify auth. */
+  claudeOAuthClientId,
+  claudeOAuthClientSecret,
 };
