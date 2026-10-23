@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 820">
+  <defs>
+    <filter id="wobble"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" seed="4"/><feDisplacementMap in="SourceGraphic" scale="6"/></filter>
+    <filter id="wobble2"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="9"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter>
+  </defs>
+  <rect width="800" height="820" fill="#e9e7e3"/>
+  <!-- shirt -->
+  <path d="M250 70 Q400 120 550 70 L720 150 L680 300 L610 270 L615 780 L185 780 L190 270 L120 300 L80 150 Z" fill="#1f2f6b" stroke="#16224f" stroke-width="4"/>
+  <path d="M300 75 Q400 140 500 75" fill="none" stroke="#16224f" stroke-width="10"/>
+
+  <g filter="url(#wobble)" stroke="#f3efe6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- tail -->
+    <path d="M360 560 C270 560 250 640 320 650 C390 660 430 620 470 615" stroke-width="5"/>
+    <path d="M335 575 l-8 -10 M310 590 l-10 -6 M300 615 l-12 0 M315 638 l-8 8 M350 645 l-2 10" stroke-width="2.5"/>
+    <!-- body -->
+    <path d="M440 370 C380 390 350 470 365 560 C375 610 430 625 470 612 C520 600 535 560 530 500 C525 440 510 400 500 380" stroke-width="5"/>
+    <!-- fur hatching -->
+    <path d="M385 450 l12 6 M378 480 l14 4 M380 510 l14 2 M390 540 l12 0 M495 430 l-10 6 M505 470 l-12 4 M510 510 l-12 2 M500 550 l-12 0" stroke-width="2.5"/>
+    <!-- front legs -->
+    <path d="M465 520 L462 610 M500 515 L505 605" stroke-width="4"/>
+    <path d="M450 612 q12 -8 24 0 M495 607 q12 -8 24 0" stroke-width="4"/>
+    <!-- head -->
+    <path d="M420 330 C415 280 440 250 470 255 L462 205 L500 240 Q520 236 540 242 L575 200 L568 262 C590 300 575 360 520 372 C470 382 425 365 420 330 Z" stroke-width="5"/>
+    <path d="M500 330 l12 8 l12 -8 M512 338 l0 10 M495 352 q17 12 34 0" stroke-width="3"/>
+    <path d="M470 335 l-45 -6 M472 345 l-44 6 M555 335 l45 -6 M553 345 l44 6" stroke-width="2"/>
+  </g>
+
+  <!-- red star -->
+  <path filter="url(#wobble2)" d="M508 248 l9 20 22 2 -17 14 6 22 -20 -12 -20 12 6 -22 -17 -14 22 -2 Z" fill="#d4282e" stroke="#9e1b20" stroke-width="2"/>
+  <!-- eyes on head -->
+  <g filter="url(#wobble2)">
+    <path d="M478 305 q14 -12 28 0 q-14 10 -28 0Z M530 305 q14 -12 28 0 q-14 10 -28 0Z" fill="#d4282e" stroke="#f3efe6" stroke-width="2"/>
+  </g>
+
+  <!-- hand-drawn tape bars with eyes -->
+  <g filter="url(#wobble2)">
+    <path d="M285 395 L475 390 L478 432 L288 438 Z" fill="#f3efe6" stroke="#cfc8b8" stroke-width="2"/>
+    <path d="M330 414 q16 -12 32 0 q-16 10 -32 0Z M400 412 q16 -12 32 0 q-16 10 -32 0Z" fill="#d4282e" stroke="#1f2f6b" stroke-width="2"/>
+    <path d="M375 465 L560 460 L562 502 L377 508 Z" fill="#f3efe6" stroke="#cfc8b8" stroke-width="2"/>
+    <path d="M420 484 q16 -12 32 0 q-16 10 -32 0Z M490 482 q16 -12 32 0 q-16 10 -32 0Z" fill="#d4282e" stroke="#1f2f6b" stroke-width="2"/>
+  </g>
+
+  <!-- handwritten text -->
+  <text x="260" y="300" transform="rotate(-5 260 300)" font-family="'Comic Sans MS','Marker Felt','Bradley Hand',cursive" font-size="34" fill="#f3efe6" filter="url(#wobble2)">what do you see?</text>
+</svg>
